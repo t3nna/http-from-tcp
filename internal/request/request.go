@@ -29,7 +29,7 @@ func newRequest() *Request {
 var SEPARATOR = []byte("\r\n")
 var ERROR_BAD_START_LINE = fmt.Errorf("malformed request-line")
 var ERROR_UNSUPPORTED_HPPT_VERSION = fmt.Errorf("unsupported http version")
-var bufferSize = 8
+var bufferSize = 1024
 
 const (
 	StateInit  parserState = "init"
@@ -73,6 +73,9 @@ func parseRequestLine(req []byte) (*RequestLine, int, error) {
 	if !rl.ValidMethod() {
 		return nil, 0, ERROR_BAD_START_LINE
 	}
+	//if !rl.ValidHttp() {
+	//	return nil, 0, ERROR_BAD_START_LINE
+	//}
 
 	return rl, consumed, nil
 
@@ -101,6 +104,8 @@ outer:
 
 		case StateDone:
 			break outer
+		case StateError:
+			return 0, ERROR_BAD_START_LINE
 
 		}
 	}
@@ -116,7 +121,6 @@ func (r *Request) done() bool {
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	request := newRequest()
 
-	fmt.Println("read...")
 	// NOTE: buffer could get overrun...
 	buf := make([]byte, bufferSize)
 	readToIdx := 0

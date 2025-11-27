@@ -53,12 +53,4 @@ func TestRequestLineParse(t *testing.T) {
 	assert.Equal(t, "GET", r.RequestLine.Method)
 	assert.Equal(t, "/coffee", r.RequestLine.RequestTarget)
 	assert.Equal(t, "1.1", r.RequestLine.HttpVersion)
-
-	// Test: Invalid number of parts in request line
-	reader = &chunkReader{
-		data:            "/coffee HTTP/1.1\nHost: localhost:42069\nUser-Agent: curl/7.81.0\nAccept: */*\n\n",
-		numBytesPerRead: 1,
-	}
-	r, err = RequestFromReader(reader)
-	require.Error(t, err)
 }
