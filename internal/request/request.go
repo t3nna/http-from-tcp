@@ -29,7 +29,7 @@ func newRequest() *Request {
 var SEPARATOR = []byte("\r\n")
 var ERROR_BAD_START_LINE = fmt.Errorf("malformed request-line")
 var ERROR_UNSUPPORTED_HPPT_VERSION = fmt.Errorf("unsupported http version")
-var bufferSize = 8
+var bufferSize = 1024
 
 const (
 	StateInit  parserState = "init"

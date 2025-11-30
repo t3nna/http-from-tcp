@@ -1,44 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
+	"github.com/t3nna/http-from-tcp/internal/request"
 	"log"
 	"net"
 )
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	ch := make(chan string)
-
-	go func() {
-		defer f.Close()
-		defer close(ch)
-		fullLine := ""
-		for {
-			data := make([]byte, 8)
-			n, err := f.Read(data)
-			if err != nil {
-				break
-			}
-			data = data[:n]
-
-			if index := bytes.IndexByte(data, '\n'); index != -1 {
-				fullLine += string(data[:index])
-				ch <- fullLine
-				fullLine = ""
-				data = data[index+1:]
-			}
-			fullLine += string(data)
-
-		}
-		if fullLine != "" {
-			ch <- fullLine
-		}
-
-	}()
-	return ch
-}
 
 func main() {
 	listener, err := net.Listen("tcp", ":42069")
@@ -55,10 +22,15 @@ func main() {
 
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
 
-		for line := range getLinesChannel(conn) {
-
-			fmt.Printf("read: %s \n", line)
+		r, err := request.RequestFromReader(conn)
+		if err != nil {
+			log.Fatalf("error %v", err)
 		}
+
+		fmt.Printf("Request line:\n")
+		fmt.Printf("- Method: %s\n", r.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", r.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", r.RequestLine.HttpVersion)
 		fmt.Println("Connection to ", conn.RemoteAddr(), "closed")
 	}
 }
