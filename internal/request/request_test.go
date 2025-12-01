@@ -55,6 +55,27 @@ func TestRequestLineParse(t *testing.T) {
 	assert.Equal(t, "/coffee", r.RequestLine.RequestTarget)
 	assert.Equal(t, "1.1", r.RequestLine.HttpVersion)
 }
+func TestParseHeaders(t *testing.T) {
+	// Test: Standard Headers
+	reader := &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
+		numBytesPerRead: 3,
+	}
+	r, err := RequestFromReader(reader)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	assert.Equal(t, "localhost:42069", r.Headers.Get("host"))
+	assert.Equal(t, "curl/7.81.0", r.Headers.Get("user-agent"))
+	assert.Equal(t, "*/*", r.Headers.Get("accept"))
+
+	// Test: Malformed Header
+	reader = &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost localhost:42069\r\n\r\n",
+		numBytesPerRead: 3,
+	}
+	r, err = RequestFromReader(reader)
+	require.Error(t, err)
+}
 
 // TestDifferentChunkSizes tests parsing with various chunk sizes from 1 byte to full request length
 func TestDifferentChunkSizes(t *testing.T) {
@@ -151,7 +172,7 @@ func TestDifferentChunkSizes(t *testing.T) {
 // TestDifferentHttpMethods tests various HTTP methods
 func TestDifferentHttpMethods(t *testing.T) {
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
-	
+
 	for _, method := range methods {
 		t.Run(method, func(t *testing.T) {
 			request := method + " /test HTTP/1.1\r\nHost: localhost\r\n\r\n"
@@ -172,9 +193,9 @@ func TestDifferentHttpMethods(t *testing.T) {
 // TestDifferentPaths tests various request paths
 func TestDifferentPaths(t *testing.T) {
 	testCases := []struct {
-		name         string
-		path         string
-		chunkSize    int
+		name      string
+		path      string
+		chunkSize int
 	}{
 		{"root path", "/", 1},
 		{"simple path", "/coffee", 2},
@@ -301,17 +322,17 @@ func TestErrorCases(t *testing.T) {
 // TestChunkBoundaryAtCriticalPoints tests chunk boundaries at critical parsing points
 func TestChunkBoundaryAtCriticalPoints(t *testing.T) {
 	baseRequest := "GET /api/users HTTP/1.1\r\nHost: localhost\r\n\r\n"
-	
+
 	// Test chunk sizes that align with critical points
 	criticalPoints := []int{
-		1,   // Before "G"
-		4,   // After "GET"
-		5,   // At the space after GET
-		6,   // At the start of path
-		10,  // In the middle of path
-		18,  // Right before \r\n
-		19,  // At \r
-		20,  // At \n
+		1,  // Before "G"
+		4,  // After "GET"
+		5,  // At the space after GET
+		6,  // At the start of path
+		10, // In the middle of path
+		18, // Right before \r\n
+		19, // At \r
+		20, // At \n
 	}
 
 	for _, point := range criticalPoints {

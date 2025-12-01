@@ -12,7 +12,6 @@ func isToken(s []byte) bool {
 	}
 
 	for _, r := range s {
-		fmt.Println(string(r))
 		if 'a' <= r && r <= 'z' {
 			continue
 		}

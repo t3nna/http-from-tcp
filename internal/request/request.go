@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"fmt"
+	"github.com/t3nna/http-from-tcp/internal/headers"
 	"io"
 	"strings"
 )
@@ -17,12 +18,14 @@ type RequestLine struct {
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     *headers.Headers
 	state       parserState
 }
 
 func newRequest() *Request {
 	return &Request{
-		state: StateInit,
+		state:   StateInit,
+		Headers: headers.NewHeaders(),
 	}
 }
 
@@ -32,9 +35,10 @@ var ERROR_UNSUPPORTED_HPPT_VERSION = fmt.Errorf("unsupported http version")
 var bufferSize = 1024
 
 const (
-	StateInit  parserState = "init"
-	StateDone  parserState = "done"
-	StateError parserState = "error"
+	StateInit          parserState = "init"
+	StateDone          parserState = "done"
+	StateError         parserState = "error"
+	StateHeaderParsing parserState = "headers"
 )
 
 func (rl *RequestLine) ValidHttp() bool {
@@ -63,7 +67,6 @@ func parseRequestLine(req []byte) (*RequestLine, int, error) {
 		return nil, 0, ERROR_UNSUPPORTED_HPPT_VERSION
 	}
 
-	fmt.Println(parts)
 	rl := &RequestLine{
 		Method:        string(parts[0]),
 		RequestTarget: string(parts[1]),
@@ -86,10 +89,11 @@ func (r *Request) parse(data []byte) (int, error) {
 
 outer:
 	for {
+		currData := data[read:]
 
 		switch r.state {
 		case StateInit:
-			rl, consumed, err := parseRequestLine(data[read:])
+			rl, consumed, err := parseRequestLine(currData)
 			if err != nil {
 				r.state = StateError
 				return 0, err
@@ -100,14 +104,37 @@ outer:
 			r.RequestLine = *rl
 			read += consumed
 
-			r.state = StateDone
+			r.state = StateHeaderParsing
+
+		case StateHeaderParsing:
+			n, done, err := r.Headers.Parse(currData)
+
+			read += n
+
+			if err != nil {
+				r.state = StateError
+				return 0, err
+			}
+			if n == 0 {
+				break outer
+			}
+
+			//if !done {
+			//	break outer
+			//}
+			if done {
+				r.state = StateDone
+			}
 
 		case StateDone:
 			break outer
 		case StateError:
 			return 0, ERROR_BAD_START_LINE
 
+		default:
+			panic("skill issue programming")
 		}
+
 	}
 
 	return read, nil
@@ -130,8 +157,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			copy(newBuf, buf)
 			buf = newBuf
 		}
-
-		fmt.Println("read...")
 
 		n, err := reader.Read(buf[readToIdx:])
 		if err == io.EOF {
