@@ -119,9 +119,6 @@ outer:
 				break outer
 			}
 
-			//if !done {
-			//	break outer
-			//}
 			if done {
 				r.state = StateDone
 			}
