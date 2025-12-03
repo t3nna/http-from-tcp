@@ -3,9 +3,11 @@ package request
 import (
 	"bytes"
 	"fmt"
-	"github.com/t3nna/http-from-tcp/internal/headers"
 	"io"
+	"strconv"
 	"strings"
+
+	"github.com/t3nna/http-from-tcp/internal/headers"
 )
 
 type parserState string
@@ -20,8 +22,24 @@ type Request struct {
 	RequestLine RequestLine
 	Headers     *headers.Headers
 	state       parserState
+	Body        string
 }
 
+func getInt(headers *headers.Headers, name string, defaultValue int) int {
+	valueStr, exists := headers.Get(name)
+
+	if !exists {
+		return defaultValue
+	}
+
+	value, err := strconv.Atoi(valueStr)
+
+	if err != nil {
+		return defaultValue
+	}
+	return value
+
+}
 func newRequest() *Request {
 	return &Request{
 		state:   StateInit,
@@ -35,10 +53,11 @@ var ERROR_UNSUPPORTED_HPPT_VERSION = fmt.Errorf("unsupported http version")
 var bufferSize = 1024
 
 const (
-	StateInit          parserState = "init"
-	StateDone          parserState = "done"
-	StateError         parserState = "error"
-	StateHeaderParsing parserState = "headers"
+	StateInit   parserState = "init"
+	StateDone   parserState = "done"
+	StateError  parserState = "error"
+	StateHeader parserState = "headers"
+	StateBody   parserState = "body"
 )
 
 func (rl *RequestLine) ValidHttp() bool {
@@ -90,6 +109,9 @@ func (r *Request) parse(data []byte) (int, error) {
 outer:
 	for {
 		currData := data[read:]
+		if len(currData) == 0 {
+			break outer
+		}
 
 		switch r.state {
 		case StateInit:
@@ -104,9 +126,9 @@ outer:
 			r.RequestLine = *rl
 			read += consumed
 
-			r.state = StateHeaderParsing
+			r.state = StateHeader
 
-		case StateHeaderParsing:
+		case StateHeader:
 			n, done, err := r.Headers.Parse(currData)
 
 			read += n
@@ -120,6 +142,22 @@ outer:
 			}
 
 			if done {
+				r.state = StateBody
+				// Continue to process body in the same iteration
+				continue
+			}
+
+		case StateBody:
+			length := getInt(r.Headers, "content-length", 0)
+			if length == 0 {
+				r.state = StateDone
+				break
+			}
+			remaining := min(length-len(r.Body), len(currData))
+			r.Body += string(currData[:remaining])
+			read += remaining
+
+			if len(r.Body) == length {
 				r.state = StateDone
 			}
 
@@ -157,6 +195,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		n, err := reader.Read(buf[readToIdx:])
 		if err == io.EOF {
+			// Validate body length matches Content-Length before finishing
+			contentLength := getInt(request.Headers, "content-length", 0)
+			if contentLength > 0 && len(request.Body) != contentLength {
+				return nil, fmt.Errorf("body length (%d) does not match Content-Length header (%d)", len(request.Body), contentLength)
+			}
 			request.state = StateDone
 			break
 		}
@@ -173,6 +216,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		copy(buf, buf[readN:readToIdx])
 		readToIdx -= readN
 	}
+	fmt.Println("=========================================================")
+	fmt.Println(string(buf))
+	fmt.Println("=========================================================")
 
 	return request, nil
 }

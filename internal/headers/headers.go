@@ -45,15 +45,17 @@ func NewHeaders() *Headers {
 	}
 }
 
-func (h *Headers) Get(name string) string {
-	return h.headers[strings.ToLower(name)]
+func (h *Headers) Get(name string) (string, bool) {
+
+	str, ok := h.headers[strings.ToLower(name)]
+	return str, ok
 }
 
 func (h *Headers) Set(name string, value string) {
-	v := h.Get(name)
+	v, ok := h.Get(name)
 	name = strings.ToLower(name)
 
-	if v == "" {
+	if !ok {
 		h.headers[name] = value
 		return
 	} else {
