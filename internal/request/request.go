@@ -142,16 +142,24 @@ outer:
 			}
 
 			if done {
+				// Headers are complete, check if we need a body
+				length := getInt(r.Headers, "content-length", 0)
+				if length == 0 {
+					r.state = StateDone
+					break outer
+				}
 				r.state = StateBody
-				// Continue to process body in the same iteration
+				// Continue loop to process body
 				continue
+			} else {
+				break outer
 			}
 
 		case StateBody:
 			length := getInt(r.Headers, "content-length", 0)
 			if length == 0 {
 				r.state = StateDone
-				break
+				break outer
 			}
 			remaining := min(length-len(r.Body), len(currData))
 			r.Body += string(currData[:remaining])
