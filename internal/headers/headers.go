@@ -63,6 +63,11 @@ func (h *Headers) Set(name string, value string) {
 		h.headers[name] = fmt.Sprintf("%s,%s", v, value)
 	}
 }
+func (h *Headers) Replace(name string, value string) {
+	name = strings.ToLower(name)
+	h.headers[name] = value
+
+}
 
 func (h *Headers) ForEach(cb func(n, v string)) {
 	for k, v := range h.headers {

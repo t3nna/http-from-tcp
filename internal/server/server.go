@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/t3nna/http-from-tcp/internal/response"
 	"io"
 	"net"
 	"sync/atomic"
@@ -11,10 +12,12 @@ type Server struct {
 	closed atomic.Bool
 }
 
-func runConnections(s *Server, conn io.ReadWriteCloser) {
-	out := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello World!")
-	conn.Write(out)
-	conn.Close()
+func runConnections(_s *Server, conn io.ReadWriteCloser) {
+	defer conn.Close()
+
+	headers := response.GetDefaultHeaders(0)
+	response.WriteStatusLine(conn, response.StatusOK)
+	response.WriteHeaders(conn, headers)
 }
 
 func runServer(s *Server, listener net.Listener) {
