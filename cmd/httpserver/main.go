@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/t3nna/http-from-tcp/internal/request"
 	"github.com/t3nna/http-from-tcp/internal/response"
 	"github.com/t3nna/http-from-tcp/internal/server"
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -13,25 +13,73 @@ import (
 
 const port = 42069
 
+func respond400() []byte {
+	return []byte(`
+<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>
+`)
+}
+func respond500() []byte {
+	return []byte(`
+<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Internal Server Error</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>
+`)
+}
+func respond200() []byte {
+	return []byte(`
+<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>
+`)
+}
+
 func main() {
-	s, err := server.Serve(port, func(w io.Writer, req *request.Request) *server.HandlerError {
+	s, err := server.Serve(port, func(w *response.Writer, req *request.Request) {
+		h := response.GetDefaultHeaders(0)
+		h.Replace("content-type", "text/html")
+		body := respond200()
+
 		if req.RequestLine.RequestTarget == "/yourproblem" {
-			return &server.HandlerError{
-				StatusCode: response.StatusBarRequest,
-				Message:    "Your problem is not my problem\n",
-			}
+			w.WriteStatusLine(response.StatusBarRequest)
 
+			body = respond400()
+			h.Replace("Content-Length", fmt.Sprintf("%d", len(body)))
+			w.WriteHeaders(h)
+			w.WriteBody(body)
 		} else if req.RequestLine.RequestTarget == "/myproblem" {
-			return &server.HandlerError{
-				StatusCode: response.StatusInternalServerError,
-				Message:    "Woopsie, my bad\n",
-			}
+			w.WriteStatusLine(response.StatusInternalServerError)
 
-		} else {
-			w.Write([]byte("All good, frfr\n"))
+			body = respond500()
+			h.Replace("Content-Length", fmt.Sprintf("%d", len(body)))
+			w.WriteHeaders(h)
+			w.WriteBody(body)
+
 		}
+		w.WriteStatusLine(response.StatusOK)
 
-		return nil
+		h.Replace("Content-Length", fmt.Sprintf("%d", len(body)))
+		w.WriteHeaders(h)
+		w.WriteBody(body)
 	})
 	if err != nil {
 		log.Fatalf("Error starting s: %v", err)

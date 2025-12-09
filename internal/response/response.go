@@ -54,3 +54,48 @@ func WriteHeaders(w io.Writer, h *headers.Headers) error {
 	_, err := w.Write(headersLine)
 	return err
 }
+
+type Writer struct {
+	writer io.Writer
+}
+
+func NewWriter(conn io.Writer) *Writer {
+	return &Writer{writer: conn}
+}
+
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
+	statusLine := []byte("")
+	switch statusCode {
+	case StatusOK:
+		statusLine = []byte("HTTP/1.1 200 OK")
+	case StatusBarRequest:
+		statusLine = []byte("HTTP/1.1 400 Bad Request")
+
+	case StatusInternalServerError:
+		statusLine = []byte("HTTP/1.1 500 Internal Server Error")
+
+	default:
+		return fmt.Errorf("unknow status code")
+	}
+
+	statusLine = append(statusLine, []byte(rn)...)
+
+	_, err := w.writer.Write(statusLine)
+	return err
+
+}
+func (w *Writer) WriteHeaders(h *headers.Headers) error {
+	var headersLine []byte
+	h.ForEach(func(key, value string) {
+		headersLine = fmt.Appendf(headersLine, "%s: %s%s", key, value, rn)
+	})
+	headersLine = fmt.Append(headersLine, rn)
+	_, err := w.writer.Write(headersLine)
+	return err
+
+}
+func (w *Writer) WriteBody(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	return n, err
+
+}

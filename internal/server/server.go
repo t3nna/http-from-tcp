@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/t3nna/http-from-tcp/internal/request"
 	"github.com/t3nna/http-from-tcp/internal/response"
@@ -14,7 +13,7 @@ type HandlerError struct {
 	StatusCode response.StatusCode
 	Message    string
 }
-type Handler func(w io.Writer, req *request.Request) *HandlerError
+type Handler func(w *response.Writer, req *request.Request)
 
 type Server struct {
 	closed  atomic.Bool
@@ -24,33 +23,17 @@ type Server struct {
 func runConnections(s *Server, conn io.ReadWriteCloser) {
 	defer conn.Close()
 
-	headers := response.GetDefaultHeaders(0)
-	fmt.Println(headers)
+	responseWriter := response.NewWriter(conn)
 
 	req, err := request.RequestFromReader(conn)
-	fmt.Println(req, err)
+
 	if err != nil {
-		response.WriteStatusLine(conn, response.StatusBarRequest)
-		response.WriteHeaders(conn, headers)
+		responseWriter.WriteStatusLine(response.StatusBarRequest)
+		responseWriter.WriteHeaders(response.GetDefaultHeaders(0))
 		return
 	}
-	writer := bytes.NewBuffer([]byte{})
-	handlerError := s.handler(writer, req)
+	s.handler(responseWriter, req)
 
-	var body []byte = nil
-	var status response.StatusCode = response.StatusOK
-	if handlerError != nil {
-		status = handlerError.StatusCode
-		body = []byte(handlerError.Message)
-	} else {
-		body = writer.Bytes()
-	}
-
-	headers.Replace("Content-Length", fmt.Sprintf("%d", len(body)))
-
-	response.WriteStatusLine(conn, status)
-	response.WriteHeaders(conn, headers)
-	conn.Write(body)
 }
 
 func runServer(s *Server, listener net.Listener) {
