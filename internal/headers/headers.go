@@ -69,6 +69,12 @@ func (h *Headers) Replace(name string, value string) {
 
 }
 
+func (h *Headers) Delete(name string) {
+	name = strings.ToLower(name)
+	delete(h.headers, name)
+
+}
+
 func (h *Headers) ForEach(cb func(n, v string)) {
 	for k, v := range h.headers {
 		cb(k, v)

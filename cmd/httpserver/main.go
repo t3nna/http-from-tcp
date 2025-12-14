@@ -6,8 +6,10 @@ import (
 	"github.com/t3nna/http-from-tcp/internal/response"
 	"github.com/t3nna/http-from-tcp/internal/server"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -74,7 +76,36 @@ func main() {
 			w.WriteHeaders(h)
 			w.WriteBody(body)
 
+		} else if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/stream") {
+			target := req.RequestLine.RequestTarget
+			res, err := http.Get("https://httpbin.org/" + target[len("/httpbin/"):])
+			if err != nil {
+				body = respond500()
+			} else {
+				w.WriteStatusLine(response.StatusOK)
+				h.Set("transfer-encoding", "chunked")
+				h.Delete("content-length")
+				h.Replace("content-type", "text/plain")
+				w.WriteHeaders(h)
+
+				for {
+					data := make([]byte, 32)
+					n, err := res.Body.Read(data)
+					if err != nil {
+						break
+					}
+
+					w.WriteBody([]byte(fmt.Sprintf("%x\r\n", n)))
+					w.WriteBody(data[:n])
+					w.WriteBody([]byte("\r\n"))
+				}
+				w.WriteBody([]byte("0\r\n\r\n"))
+
+				return
+			}
+
 		}
+
 		w.WriteStatusLine(response.StatusOK)
 
 		h.Replace("Content-Length", fmt.Sprintf("%d", len(body)))
