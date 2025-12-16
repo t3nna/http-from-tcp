@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"github.com/t3nna/http-from-tcp/internal/headers"
 	"github.com/t3nna/http-from-tcp/internal/request"
 	"github.com/t3nna/http-from-tcp/internal/response"
 	"github.com/t3nna/http-from-tcp/internal/server"
@@ -55,6 +57,15 @@ func respond200() []byte {
 `)
 }
 
+func toStr(bytes []byte) string {
+	out := ""
+	for _, v := range bytes {
+		out += fmt.Sprintf("%02x", v)
+	}
+
+	return out
+}
+
 func main() {
 	s, err := server.Serve(port, func(w *response.Writer, req *request.Request) {
 		h := response.GetDefaultHeaders(0)
@@ -86,8 +97,11 @@ func main() {
 				h.Set("transfer-encoding", "chunked")
 				h.Delete("content-length")
 				h.Replace("content-type", "text/plain")
+				h.Set("Trailer", "X-Content-SHA256")
+				h.Set("Trailer", "X-Content-Length")
 				w.WriteHeaders(h)
 
+				var fullBody []byte
 				for {
 					data := make([]byte, 32)
 					n, err := res.Body.Read(data)
@@ -95,11 +109,17 @@ func main() {
 						break
 					}
 
+					fullBody = append(fullBody, data[:n]...)
 					w.WriteBody([]byte(fmt.Sprintf("%x\r\n", n)))
 					w.WriteBody(data[:n])
 					w.WriteBody([]byte("\r\n"))
 				}
-				w.WriteBody([]byte("0\r\n\r\n"))
+				w.WriteBody([]byte("0\r\n"))
+				trailer := headers.NewHeaders()
+				check := sha256.Sum256(fullBody)
+				trailer.Set("X-Content-SHA256", toStr(check[:]))
+				trailer.Set("X-Content-Length", fmt.Sprintf("%d", len(fullBody)))
+				w.WriteHeaders(trailer)
 
 				return
 			}
