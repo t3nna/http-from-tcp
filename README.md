@@ -44,18 +44,6 @@ curl -i http://localhost:42069/video
 
 The streaming route requires network access to httpbin.org. The video file is not included in the repository; provide `assets/vim.mp4` from the repository root to try that route. The current error handling for these examples is incomplete, so an upstream or file error may not produce the expected error response.
 
-## Other exercises
-
-Run these from the repository root:
-
-```sh
-go run ./cmd/tcplistener
-go run ./cmd/udpsender
-go run ./readFromFile.go
-```
-
-The TCP listener accepts connections on port `42069` and prints parsed request lines and headers. Stop the HTTP server before starting it because both use the same TCP port. The UDP sender sends lines entered on standard input to `localhost:42069`; it needs a separate UDP receiver. The TCP listener cannot receive UDP messages. The file-reading exercise reads `messages.txt` in small chunks and prints its lines.
-
 ## Tests
 
 ```sh
